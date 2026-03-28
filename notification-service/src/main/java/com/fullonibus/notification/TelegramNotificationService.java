@@ -1,9 +1,11 @@
 package com.fullonibus.notification;
 
 import com.fullonibus.highlight.Highlight;
+import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@Service
 public class TelegramNotificationService {
 
     private String botToken;
