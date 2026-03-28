@@ -72,4 +72,13 @@ public class IrcManager {
     public Set<String> getConnectedChannels() {
         return activeClients.keySet();
     }
+
+    public void disconnect(String channel) {
+        String channelName = channel.startsWith("#") ? channel : "#" + channel;
+        TwitchIrcClient client = activeClients.remove(channelName);
+        if (client != null) {
+            client.disconnect();
+            log.info("Disconnected from channel: {}", channelName);
+        }
+    }
 }

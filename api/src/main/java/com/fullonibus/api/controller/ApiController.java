@@ -34,8 +34,19 @@ public class ApiController {
         return ResponseEntity.ok(Map.of("channel", channel, "status", "connecting"));
     }
 
+    @PostMapping("/channels/{channel}/disconnect")
+    public ResponseEntity<Map<String, String>> disconnectChannel(@PathVariable String channel) {
+        ircManager.disconnect(channel);
+        return ResponseEntity.ok(Map.of("channel", channel, "status", "disconnected"));
+    }
+
     @GetMapping("/highlights")
-    public ResponseEntity<List<Highlight>> getHighlights() {
-        return ResponseEntity.ok(highlightService.getHighlights());
+    public ResponseEntity<List<Highlight>> getHighlights(@RequestParam(required = false) String channel) {
+        List<Highlight> all = highlightService.getHighlights();
+        if (channel != null && !channel.isBlank()) {
+            String ch = channel.startsWith("#") ? channel : "#" + channel;
+            all = all.stream().filter(h -> ch.equals(h.getChannel())).collect(java.util.stream.Collectors.toList());
+        }
+        return ResponseEntity.ok(all);
     }
 }

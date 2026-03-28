@@ -6,8 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -55,10 +53,11 @@ public class HighlightScorer {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
 
-        String snippet = messages.stream()
-                .map(ChatMessage::getText)
+        List<String> topMessages = messages.stream()
+                .sorted(Comparator.comparingInt(m -> -m.getEmotes().size()))
                 .limit(3)
-                .collect(Collectors.joining(" | "));
+                .map(m -> m.getDisplayName() + ": " + m.getText())
+                .collect(Collectors.toList());
 
         return Highlight.builder()
                 .id(UUID.randomUUID().toString())
@@ -70,7 +69,7 @@ public class HighlightScorer {
                 .emoteCount(emoteCount)
                 .messageRate(Math.round(messageRate * 100.0) / 100.0)
                 .topEmotes(topEmotes)
-                .snippet(snippet)
+                .topMessages(topMessages)
                 .build();
     }
 }

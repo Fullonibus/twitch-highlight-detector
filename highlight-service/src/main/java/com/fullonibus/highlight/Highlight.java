@@ -19,5 +19,5 @@ public class Highlight {
     int emoteCount;
     double messageRate;
     List<String> topEmotes;
-    String snippet;
+    List<String> topMessages;
 }

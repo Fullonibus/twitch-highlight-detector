@@ -51,8 +51,8 @@ public class SpikeDetector {
 
         if (currentRate > baselineRate * thresholdMultiplier) {
             List<ChatMessage> snapshot = buffer.snapshot();
-            log.info("Spike detected! rate={:.1f} msg/s, baseline={:.1f}, messages in window={}",
-                    currentRate, baselineRate, snapshot.size());
+            log.info("Spike detected! rate={} msg/s, baseline={}, messages in window={}",
+                    String.format("%.1f", currentRate), String.format("%.1f", baselineRate), snapshot.size());
 
             lastSpikeTime = now;
             if (spikeHandler != null) {
