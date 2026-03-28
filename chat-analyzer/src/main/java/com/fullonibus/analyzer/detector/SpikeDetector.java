@@ -5,6 +5,7 @@ import com.fullonibus.twitchirc.model.ChatMessage;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
 

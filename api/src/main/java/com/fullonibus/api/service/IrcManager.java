@@ -1,6 +1,7 @@
 package com.fullonibus.api.service;
 
 import com.fullonibus.analyzer.detector.SpikeDetector;
+import com.fullonibus.highlight.Highlight;
 import com.fullonibus.highlight.HighlightScorer;
 import com.fullonibus.notification.TelegramNotificationService;
 import com.fullonibus.twitchirc.client.TwitchIrcClient;

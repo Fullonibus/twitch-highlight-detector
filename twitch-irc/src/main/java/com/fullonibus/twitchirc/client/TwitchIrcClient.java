@@ -4,7 +4,7 @@ import com.fullonibus.twitchirc.model.ChatMessage;
 import com.fullonibus.twitchirc.parser.IrcMessageParser;
 import lombok.extern.slf4j.Slf4j;
 import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshakes.ServerHandshake;
+import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.util.concurrent.ExecutorService;
