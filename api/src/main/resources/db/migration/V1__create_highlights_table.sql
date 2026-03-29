@@ -3,10 +3,10 @@ CREATE TABLE highlights (
     channel VARCHAR(255) NOT NULL,
     start_timestamp TIMESTAMP NOT NULL,
     end_timestamp TIMESTAMP NOT NULL,
-    score DOUBLE NOT NULL,
+    score DOUBLE PRECISION NOT NULL,
     message_count INT NOT NULL,
     emote_count INT NOT NULL,
-    message_rate DOUBLE NOT NULL,
+    message_rate DOUBLE PRECISION NOT NULL,
     top_emotes TEXT,
     top_messages TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
