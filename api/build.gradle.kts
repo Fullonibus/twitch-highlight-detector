@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":chat-analyzer"))
     implementation(project(":emote-dictionary"))
     implementation(project(":highlight-service"))
+    implementation(project(":notification-service"))
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
