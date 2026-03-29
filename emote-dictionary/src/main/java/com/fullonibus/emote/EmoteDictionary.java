@@ -21,14 +21,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class EmoteDictionary {
 
-    private static final String TWITCH_EMOTES_URL = "https://api.twitchemotes.com/api/v4/channels/0";
-    private static final String HELIX_GLOBAL_EMOTES_URL = "https://api.twitch.tv/helix/chat/emotes/global";
     private static final String SEVENTV_GLOBAL_URL = "https://7tv.io/v3/emote-sets/global";
     private static final String FFZ_GLOBAL_URL = "https://api.frankerfacez.com/v1/set/global";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
-    @Value("${twitch.client-id:}")
-    private String twitchClientId;
+    @Value("${emote.7tv.enabled:true}")
+    private boolean seventvEnabled;
+
+    @Value("${emote.ffz.enabled:true}")
+    private boolean ffzEnabled;
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -44,76 +45,9 @@ public class EmoteDictionary {
     @PostConstruct
     public void loadGlobalEmotes() {
         int before = emoteIdToName.size();
-        loadTwitchemotes();
-        loadHelixGlobalEmotes();
-        load7TvEmotes();
-        loadFfzEmotes();
-        log.info("Loaded {} global emotes (was {} before)", emoteIdToName.size(), before);
-    }
-
-    private void loadTwitchemotes() {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(TWITCH_EMOTES_URL))
-                    .timeout(REQUEST_TIMEOUT)
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                log.warn("Failed to load twitchemotes.com global emotes: HTTP {}", response.statusCode());
-                return;
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
-            if (root.has("emotes")) {
-                for (JsonNode emote : root.get("emotes")) {
-                    String id = emote.has("id") ? emote.get("id").asText() : null;
-                    String code = emote.has("code") ? emote.get("code").asText() : null;
-                    if (id != null && code != null) {
-                        emoteIdToName.put(id, code);
-                    }
-                }
-            }
-            log.info("Loaded {} emotes from twitchemotes.com", emoteIdToName.size());
-        } catch (Exception e) {
-            log.error("Failed to load twitchemotes.com global emotes", e);
-        }
-    }
-
-    private void loadHelixGlobalEmotes() {
-        if (twitchClientId == null || twitchClientId.isBlank()) {
-            log.info("No twitch.client-id configured, skipping Helix global emotes");
-            return;
-        }
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(HELIX_GLOBAL_EMOTES_URL))
-                    .timeout(REQUEST_TIMEOUT)
-                    .header("Client-Id", twitchClientId)
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                log.warn("Failed to load Helix global emotes: HTTP {}", response.statusCode());
-                return;
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
-            if (root.has("data")) {
-                for (JsonNode emote : root.get("data")) {
-                    String id = emote.has("id") ? emote.get("id").asText() : null;
-                    String name = emote.has("name") ? emote.get("name").asText() : null;
-                    if (id != null && name != null) {
-                        emoteIdToName.put(id, name);
-                    }
-                }
-            }
-            log.info("Loaded emotes from Helix API, total now {}", emoteIdToName.size());
-        } catch (Exception e) {
-            log.error("Failed to load Helix global emotes", e);
-        }
+        if (seventvEnabled) load7TvEmotes();
+        if (ffzEnabled) loadFfzEmotes();
+        log.info("Loaded {} global emotes total", emoteIdToName.size());
     }
 
     private void load7TvEmotes() {
