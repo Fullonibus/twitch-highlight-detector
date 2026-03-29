@@ -5,10 +5,13 @@ import com.fullonibus.api.service.IrcManager;
 import com.fullonibus.highlight.Highlight;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.time.Instant;
 import java.util.Map;
 
 @Slf4j
@@ -41,12 +44,36 @@ public class ApiController {
     }
 
     @GetMapping("/highlights")
-    public ResponseEntity<List<Highlight>> getHighlights(@RequestParam(required = false) String channel) {
-        List<Highlight> all = highlightService.getHighlights();
+    public ResponseEntity<Page<Highlight>> getHighlights(
+            @RequestParam(required = false) String channel,
+            @RequestParam(required = false) Double minScore,
+            @RequestParam(required = false) Instant from,
+            @PageableDefault(size = 20, sort = "score", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
+
+        String normalizedChannel = null;
         if (channel != null && !channel.isBlank()) {
-            String ch = channel.startsWith("#") ? channel : "#" + channel;
-            all = all.stream().filter(h -> ch.equals(h.getChannel())).collect(java.util.stream.Collectors.toList());
+            normalizedChannel = channel.startsWith("#") ? channel : "#" + channel;
         }
-        return ResponseEntity.ok(all);
+
+        Page<Highlight> result;
+        if (normalizedChannel != null && minScore != null && from != null) {
+            result = highlightService.getHighlightsByChannelAndMinScoreAndFrom(normalizedChannel, minScore, from, pageable);
+        } else if (normalizedChannel != null && minScore != null) {
+            result = highlightService.getHighlightsByChannelAndMinScore(normalizedChannel, minScore, pageable);
+        } else if (normalizedChannel != null && from != null) {
+            result = highlightService.getHighlightsByChannelAndFrom(normalizedChannel, from, pageable);
+        } else if (normalizedChannel != null) {
+            result = highlightService.getHighlightsByChannel(normalizedChannel, pageable);
+        } else if (minScore != null && from != null) {
+            result = highlightService.getHighlightsByMinScoreAndFrom(minScore, from, pageable);
+        } else if (minScore != null) {
+            result = highlightService.getHighlightsByMinScore(minScore, pageable);
+        } else if (from != null) {
+            result = highlightService.getHighlightsByFrom(from, pageable);
+        } else {
+            result = highlightService.getHighlights(pageable);
+        }
+
+        return ResponseEntity.ok(result);
     }
 }

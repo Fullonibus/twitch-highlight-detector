@@ -1,0 +1,21 @@
+version: '3.8'
+
+# Twitch Highlight Detector — PostgreSQL for production
+# Usage: docker compose up -d
+# Then run the app with: ./gradlew :api:bootRun --args='--spring.profiles.active=prod'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: twitch-highlights-db
+    environment:
+      POSTGRES_DB: twitch_highlights
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
