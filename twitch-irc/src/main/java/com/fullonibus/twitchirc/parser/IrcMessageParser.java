@@ -132,7 +132,8 @@ public final class IrcMessageParser {
     }
 
     public static boolean isPing(String rawMessage) {
-        return "PING".equalsIgnoreCase(rawMessage.trim());
+        String trimmed = rawMessage.trim();
+        return trimmed.equals("PING") || trimmed.startsWith("PING ");
     }
 
     public static String pongResponse() {

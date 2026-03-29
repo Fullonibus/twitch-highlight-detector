@@ -1,6 +1,7 @@
 package com.fullonibus.api.service;
 
 import com.fullonibus.analyzer.detector.SpikeDetector;
+import com.fullonibus.emote.EmoteDictionary;
 import com.fullonibus.highlight.Highlight;
 import com.fullonibus.highlight.HighlightScorer;
 import com.fullonibus.notification.TelegramNotificationService;
@@ -30,13 +31,40 @@ public class IrcManager {
     @Value("${telegram.chat-id:}")
     private String telegramChatId;
 
+    @Value("${detector.window-seconds:30}")
+    private int detectorWindowSeconds;
+
+    @Value("${detector.threshold-multiplier:3.0}")
+    private double detectorThresholdMultiplier;
+
+    @Value("${detector.cooldown-seconds:30}")
+    private int detectorCooldownSeconds;
+
+    @Value("${detector.min-message-count:5}")
+    private int detectorMinMessageCount;
+
+    @Value("${detector.min-emote-density:0.1}")
+    private double detectorMinEmoteDensity;
+
+    @Value("${scoring.emote-weight:2.0}")
+    private double scoringEmoteWeight;
+
+    @Value("${scoring.rate-weight:1.5}")
+    private double scoringRateWeight;
+
+    @Value("${scoring.subscriber-weight:1.2}")
+    private double scoringSubscriberWeight;
+
     private final HighlightService highlightService;
     private final TelegramNotificationService notificationService;
+    private final EmoteDictionary emoteDictionary;
     private final Map<String, TwitchIrcClient> activeClients = new ConcurrentHashMap<>();
 
-    public IrcManager(HighlightService highlightService, TelegramNotificationService notificationService) {
+    public IrcManager(HighlightService highlightService, TelegramNotificationService notificationService,
+                      EmoteDictionary emoteDictionary) {
         this.highlightService = highlightService;
         this.notificationService = notificationService;
+        this.emoteDictionary = emoteDictionary;
     }
 
     @PostConstruct
@@ -52,8 +80,15 @@ public class IrcManager {
 
         TwitchIrcClient client = new TwitchIrcClient(twitchToken);
 
-        SpikeDetector detector = new SpikeDetector(Duration.ofSeconds(30), 3.0, Duration.ofSeconds(30));
-        HighlightScorer scorer = new HighlightScorer();
+        SpikeDetector detector = new SpikeDetector(
+                Duration.ofSeconds(detectorWindowSeconds),
+                detectorThresholdMultiplier,
+                Duration.ofSeconds(detectorCooldownSeconds),
+                detectorMinMessageCount,
+                detectorMinEmoteDensity
+        );
+        HighlightScorer scorer = new HighlightScorer(
+                scoringEmoteWeight, scoringRateWeight, scoringSubscriberWeight, emoteDictionary);
 
         detector.onSpike(messages -> {
             Highlight highlight = scorer.score(messages, channel);
