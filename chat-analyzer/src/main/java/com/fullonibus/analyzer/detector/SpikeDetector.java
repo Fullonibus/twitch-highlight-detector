@@ -40,10 +40,10 @@ public class SpikeDetector {
 
     public void ingest(ChatMessage message) {
         buffer.add(message);
-        checkForSpike(message.getChannel());
+        checkForSpike();
     }
 
-    private void checkForSpike(String channel) {
+    private void checkForSpike() {
         Instant now = Instant.now();
         if (now.isBefore(lastSpikeTime.plus(cooldown))) {
             return;
@@ -59,6 +59,8 @@ public class SpikeDetector {
         }
 
         List<ChatMessage> snapshot = buffer.snapshot();
+        if (snapshot.isEmpty()) return;
+        String channel = snapshot.get(0).getChannel();
         if (snapshot.size() < minMessageCount) {
             return;
         }
