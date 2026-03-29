@@ -4,8 +4,11 @@ import com.fullonibus.analyzer.detector.SpikeDetector;
 import com.fullonibus.emote.EmoteDictionary;
 import com.fullonibus.highlight.Highlight;
 import com.fullonibus.highlight.HighlightScorer;
+import com.fullonibus.notification.HighlightData;
+import com.fullonibus.notification.TelegramNotificationService;
 import com.fullonibus.twitchirc.client.TwitchIrcClient;
 import com.fullonibus.twitchirc.model.ChatMessage;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -47,13 +50,30 @@ public class IrcManager {
     @Value("${scoring.subscriber-weight:1.2}")
     private double scoringSubscriberWeight;
 
+    @Value("${telegram.bot-token:}")
+    private String telegramBotToken;
+
+    @Value("${telegram.chat-id:}")
+    private String telegramChatId;
+
+    @Value("${notification.enabled:true}")
+    private boolean notificationEnabled;
+
     private final HighlightService highlightService;
     private final EmoteDictionary emoteDictionary;
+    private final TelegramNotificationService notificationService;
     private final Map<String, TwitchIrcClient> activeClients = new ConcurrentHashMap<>();
 
-    public IrcManager(HighlightService highlightService, EmoteDictionary emoteDictionary) {
+    public IrcManager(HighlightService highlightService, EmoteDictionary emoteDictionary,
+                      TelegramNotificationService notificationService) {
         this.highlightService = highlightService;
         this.emoteDictionary = emoteDictionary;
+        this.notificationService = notificationService;
+    }
+
+    @PostConstruct
+    public void init() {
+        notificationService.configure(telegramBotToken, telegramChatId);
     }
 
     public void connect(String channel) {
@@ -78,6 +98,13 @@ public class IrcManager {
             Highlight highlight = scorer.score(messages, channel);
             if (highlight != null) {
                 highlightService.addHighlight(highlight);
+                if (notificationEnabled) {
+                    try {
+                        notificationService.sendHighlight(toHighlightData(highlight));
+                    } catch (Exception e) {
+                        log.error("Failed to send notification for highlight: {}", e.getMessage());
+                    }
+                }
             }
         });
 
@@ -85,6 +112,23 @@ public class IrcManager {
         client.connect(channel);
         activeClients.put(channel, client);
         log.info("Connecting to channel: {}", channel);
+    }
+
+    private HighlightData toHighlightData(Highlight h) {
+        return new HighlightData(
+                h.getChannel(),
+                h.getStartTimestamp(),
+                h.getScore(),
+                h.getMessageCount(),
+                h.getEmoteCount(),
+                h.getMessageRate(),
+                h.getTopEmotes(),
+                h.getTopMessages()
+        );
+    }
+
+    public boolean isNotificationEnabled() {
+        return notificationEnabled;
     }
 
     public Set<String> getConnectedChannels() {

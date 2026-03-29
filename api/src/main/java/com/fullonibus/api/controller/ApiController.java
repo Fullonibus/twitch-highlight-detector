@@ -3,6 +3,7 @@ package com.fullonibus.api.controller;
 import com.fullonibus.api.service.HighlightService;
 import com.fullonibus.api.service.IrcManager;
 import com.fullonibus.highlight.Highlight;
+import com.fullonibus.notification.TelegramNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ public class ApiController {
 
     private final IrcManager ircManager;
     private final HighlightService highlightService;
+    private final TelegramNotificationService notificationService;
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
@@ -75,5 +77,19 @@ public class ApiController {
         }
 
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/notifications/test")
+    public ResponseEntity<Map<String, String>> testNotification() {
+        notificationService.sendTestMessage();
+        return ResponseEntity.ok(Map.of("status", notificationService.isConfigured() ? "sent" : "not_configured"));
+    }
+
+    @GetMapping("/notifications/status")
+    public ResponseEntity<Map<String, Object>> notificationStatus() {
+        return ResponseEntity.ok(Map.of(
+                "configured", notificationService.isConfigured(),
+                "enabled", ircManager.isNotificationEnabled()
+        ));
     }
 }
