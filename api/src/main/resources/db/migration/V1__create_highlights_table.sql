@@ -1,5 +1,5 @@
 CREATE TABLE highlights (
-    id UUID DEFAULT RANDOM_UUID() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     channel VARCHAR(255) NOT NULL,
     start_timestamp TIMESTAMP NOT NULL,
     end_timestamp TIMESTAMP NOT NULL,
