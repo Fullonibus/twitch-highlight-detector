@@ -34,9 +34,16 @@ subprojects {
         testAnnotationProcessor("org.projectlombok:lombok")
 
         implementation("org.slf4j:slf4j-api")
+
+        testImplementation("org.junit.jupiter:junit-jupiter")
+        testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     }
 
     tasks.withType<JavaCompile> {
         options.encoding = "UTF-8"
+    }
+
+    tasks.withType<Test> {
+        useJUnitPlatform()
     }
 }

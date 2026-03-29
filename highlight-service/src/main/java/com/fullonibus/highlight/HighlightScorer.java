@@ -1,5 +1,6 @@
 package com.fullonibus.highlight;
 
+import com.fullonibus.emote.EmoteDictionary;
 import com.fullonibus.twitchirc.model.ChatMessage;
 import lombok.extern.slf4j.Slf4j;
 
@@ -11,10 +12,21 @@ import java.util.stream.Collectors;
 @Slf4j
 public class HighlightScorer {
 
-    private static final double EMOTE_WEIGHT = 2.0;
-    private static final double RATE_WEIGHT = 1.5;
-    private static final double SUBSCRIBER_WEIGHT = 1.2;
-    private static final int MAX_TOP_EMOTES = 5;
+    private final double emoteWeight;
+    private final double rateWeight;
+    private final double subscriberWeight;
+    private final int maxTopEmotes;
+    private final EmoteDictionary emoteDictionary;
+
+    private static final int DEFAULT_MAX_TOP_EMOTES = 5;
+
+    public HighlightScorer(double emoteWeight, double rateWeight, double subscriberWeight, EmoteDictionary emoteDictionary) {
+        this.emoteWeight = emoteWeight;
+        this.rateWeight = rateWeight;
+        this.subscriberWeight = subscriberWeight;
+        this.maxTopEmotes = DEFAULT_MAX_TOP_EMOTES;
+        this.emoteDictionary = emoteDictionary;
+    }
 
     public Highlight score(List<ChatMessage> messages, String channel) {
         if (messages == null || messages.isEmpty()) {
@@ -43,14 +55,14 @@ public class HighlightScorer {
         double emoteDensity = messageCount > 0 ? (double) emoteCount / messageCount : 0;
         double subRatio = messageCount > 0 ? (double) subCount / messageCount : 0;
 
-        double score = (messageRate * RATE_WEIGHT)
-                + (emoteDensity * EMOTE_WEIGHT * 10)
-                + (subRatio * SUBSCRIBER_WEIGHT * 5);
+        double score = (messageRate * rateWeight)
+                + (emoteDensity * emoteWeight * 10)
+                + (subRatio * subscriberWeight * 5);
 
         List<String> topEmotes = emoteFrequency.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(MAX_TOP_EMOTES)
-                .map(Map.Entry::getKey)
+                .limit(maxTopEmotes)
+                .map(e -> resolveEmoteName(e.getKey()) + "(" + e.getValue() + ")")
                 .collect(Collectors.toList());
 
         List<String> topMessages = messages.stream()
@@ -71,5 +83,12 @@ public class HighlightScorer {
                 .topEmotes(topEmotes)
                 .topMessages(topMessages)
                 .build();
+    }
+
+    private String resolveEmoteName(String emoteId) {
+        if (emoteDictionary != null) {
+            return emoteDictionary.resolveEmoteName(emoteId);
+        }
+        return emoteId;
     }
 }
