@@ -4,14 +4,12 @@ import com.fullonibus.analyzer.detector.SpikeDetector;
 import com.fullonibus.emote.EmoteDictionary;
 import com.fullonibus.highlight.Highlight;
 import com.fullonibus.highlight.HighlightScorer;
-import com.fullonibus.notification.TelegramNotificationService;
 import com.fullonibus.twitchirc.client.TwitchIrcClient;
 import com.fullonibus.twitchirc.model.ChatMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -24,12 +22,6 @@ public class IrcManager {
 
     @Value("${twitch.irc.token:}")
     private String twitchToken;
-
-    @Value("${telegram.bot-token:}")
-    private String telegramBotToken;
-
-    @Value("${telegram.chat-id:}")
-    private String telegramChatId;
 
     @Value("${detector.window-seconds:30}")
     private int detectorWindowSeconds;
@@ -56,20 +48,12 @@ public class IrcManager {
     private double scoringSubscriberWeight;
 
     private final HighlightService highlightService;
-    private final TelegramNotificationService notificationService;
     private final EmoteDictionary emoteDictionary;
     private final Map<String, TwitchIrcClient> activeClients = new ConcurrentHashMap<>();
 
-    public IrcManager(HighlightService highlightService, TelegramNotificationService notificationService,
-                      EmoteDictionary emoteDictionary) {
+    public IrcManager(HighlightService highlightService, EmoteDictionary emoteDictionary) {
         this.highlightService = highlightService;
-        this.notificationService = notificationService;
         this.emoteDictionary = emoteDictionary;
-    }
-
-    @PostConstruct
-    public void init() {
-        notificationService.configure(telegramBotToken, telegramChatId);
     }
 
     public void connect(String channel) {
@@ -94,7 +78,6 @@ public class IrcManager {
             Highlight highlight = scorer.score(messages, channel);
             if (highlight != null) {
                 highlightService.addHighlight(highlight);
-                notificationService.sendHighlight(highlight);
             }
         });
 
