@@ -5,10 +5,12 @@ import com.fullonibus.analyzer.detector.ViewerCountTracker;
 import com.fullonibus.emote.EmoteDictionary;
 import com.fullonibus.highlight.Highlight;
 import com.fullonibus.highlight.HighlightScorer;
+import com.fullonibus.api.metrics.AppMetrics;
 import com.fullonibus.notification.HighlightData;
 import com.fullonibus.notification.TelegramNotificationService;
 import com.fullonibus.twitchirc.client.TwitchIrcClient;
 import com.fullonibus.twitchirc.model.ChatMessage;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
-public class IrcManager {
+public class IrcManager implements AppMetrics.IrcConnectionProvider, AppMetrics.ViewerCountProvider {
 
     @Value("${twitch.irc.token:}")
     private String twitchToken;
@@ -79,19 +81,22 @@ public class IrcManager {
     private final HighlightService highlightService;
     private final EmoteDictionary emoteDictionary;
     private final TelegramNotificationService notificationService;
+    private final AppMetrics appMetrics;
     private final Map<String, TwitchIrcClient> activeClients = new ConcurrentHashMap<>();
     private volatile ViewerCountTracker viewerCountTracker;
 
     public IrcManager(HighlightService highlightService, EmoteDictionary emoteDictionary,
-                      TelegramNotificationService notificationService) {
+                      TelegramNotificationService notificationService, AppMetrics appMetrics) {
         this.highlightService = highlightService;
         this.emoteDictionary = emoteDictionary;
         this.notificationService = notificationService;
+        this.appMetrics = appMetrics;
     }
 
     @PostConstruct
     public void init() {
         notificationService.configure(telegramBotToken, telegramChatId);
+        appMetrics.registerIrcConnectionsGauge(this);
 
         if (viewerTrackingEnabled && twitchApiClientId != null && !twitchApiClientId.isEmpty()) {
             viewerCountTracker = new ViewerCountTracker(
@@ -112,6 +117,17 @@ public class IrcManager {
             client.disconnect();
         }
         activeClients.clear();
+    }
+
+    @Override
+    public int getActiveConnectionCount() {
+        return activeClients.size();
+    }
+
+    @Override
+    public int getViewerCount(String channel) {
+        if (viewerCountTracker == null) return 0;
+        return viewerCountTracker.getViewerCount(channel);
     }
 
     public void connect(String channel) {
@@ -135,12 +151,15 @@ public class IrcManager {
             detector.setViewerCountTracker(viewerCountTracker);
             String cleanChannel = channel.startsWith("#") ? channel.substring(1) : channel;
             viewerCountTracker.trackChannel(cleanChannel);
+            appMetrics.registerViewerCountGauge(this, cleanChannel);
         }
 
         HighlightScorer scorer = new HighlightScorer(
                 scoringEmoteWeight, scoringRateWeight, scoringSubscriberWeight, emoteDictionary);
 
         detector.onSpike(messages -> {
+            String ch = messages.isEmpty() ? channel : messages.get(0).getChannel();
+            appMetrics.recordSpikeDetected(ch);
             Highlight highlight = scorer.score(messages, channel);
             if (highlight != null) {
                 highlightService.addHighlight(highlight);
@@ -154,7 +173,16 @@ public class IrcManager {
             }
         });
 
-        client.onMessage(detector::ingest);
+        client.onMessage(msg -> {
+            appMetrics.recordMessageIngested();
+            Timer.Sample sample = appMetrics.startDetectionTimer();
+            try {
+                detector.ingest(msg);
+            } finally {
+                appMetrics.stopDetectionTimer(sample);
+            }
+        });
+
         client.connect(channel);
         activeClients.put(channel, client);
         log.info("Connecting to channel: {}", channel);
@@ -189,6 +217,7 @@ public class IrcManager {
             if (viewerCountTracker != null) {
                 String cleanChannel = channelName.substring(1);
                 viewerCountTracker.untrackChannel(cleanChannel);
+                appMetrics.removeViewerCountGauge(cleanChannel);
             }
             log.info("Disconnected from channel: {}", channelName);
         }
