@@ -35,6 +35,16 @@ public class EmoteDictionary {
     private final ObjectMapper objectMapper;
     private final Map<String, String> emoteIdToName = new ConcurrentHashMap<>();
 
+    // Common text emotes not in 7TV/FFZ global sets
+    private static final Map<String, String> STATIC_EMOTES;
+    static {
+        Map<String, String> m = new HashMap<>();
+        String[] emotes = {"xdd","xd",":3","kekw","lul","pog","omegalul","monkaS","pepega","sadge","kappa","pogchamp","ez",":)","<3",";)",":D",":P","rip","gg","ezclap","catjam","pepehands","cope"};
+        for (String e : emotes) m.put(e, e);
+        STATIC_EMOTES = Collections.unmodifiableMap(m);
+    }
+
+
     public EmoteDictionary() {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(REQUEST_TIMEOUT)
@@ -47,7 +57,11 @@ public class EmoteDictionary {
         int before = emoteIdToName.size();
         if (seventvEnabled) load7TvEmotes();
         if (ffzEnabled) loadFfzEmotes();
-        log.info("Loaded {} global emotes total", emoteIdToName.size());
+        // Add static text emotes
+        for (var entry : STATIC_EMOTES.entrySet()) {
+            emoteIdToName.putIfAbsent("static:" + entry.getKey(), entry.getValue());
+        }
+        log.info("Loaded {} global emotes total (incl. {} static)", emoteIdToName.size(), STATIC_EMOTES.size());
     }
 
     private void load7TvEmotes() {

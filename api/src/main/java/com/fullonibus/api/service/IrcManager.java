@@ -1,6 +1,7 @@
 package com.fullonibus.api.service;
 
 import com.fullonibus.analyzer.detector.SpikeDetector;
+import com.fullonibus.analyzer.detector.ViewerCountTracker;
 import com.fullonibus.emote.EmoteDictionary;
 import com.fullonibus.highlight.Highlight;
 import com.fullonibus.highlight.HighlightScorer;
@@ -9,6 +10,7 @@ import com.fullonibus.notification.TelegramNotificationService;
 import com.fullonibus.twitchirc.client.TwitchIrcClient;
 import com.fullonibus.twitchirc.model.ChatMessage;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -59,10 +61,26 @@ public class IrcManager {
     @Value("${notification.enabled:true}")
     private boolean notificationEnabled;
 
+    @Value("${highlight.viewers.enabled:true}")
+    private boolean viewerTrackingEnabled;
+
+    @Value("${highlight.viewers.poll-interval-seconds:60}")
+    private long viewerPollIntervalSeconds;
+
+    @Value("${twitch.api.client-id:}")
+    private String twitchApiClientId;
+
+    @Value("${twitch.api.access-token:}")
+    private String twitchApiAccessToken;
+
+    @Value("${twitch.api.refresh-token:}")
+    private String twitchApiRefreshToken;
+
     private final HighlightService highlightService;
     private final EmoteDictionary emoteDictionary;
     private final TelegramNotificationService notificationService;
     private final Map<String, TwitchIrcClient> activeClients = new ConcurrentHashMap<>();
+    private volatile ViewerCountTracker viewerCountTracker;
 
     public IrcManager(HighlightService highlightService, EmoteDictionary emoteDictionary,
                       TelegramNotificationService notificationService) {
@@ -74,6 +92,26 @@ public class IrcManager {
     @PostConstruct
     public void init() {
         notificationService.configure(telegramBotToken, telegramChatId);
+
+        if (viewerTrackingEnabled && twitchApiClientId != null && !twitchApiClientId.isEmpty()) {
+            viewerCountTracker = new ViewerCountTracker(
+                    twitchApiClientId, twitchApiAccessToken, twitchApiRefreshToken, viewerPollIntervalSeconds);
+            viewerCountTracker.start();
+            log.info("Viewer count tracking enabled");
+        } else {
+            log.info("Viewer count tracking disabled");
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        if (viewerCountTracker != null) {
+            viewerCountTracker.stop();
+        }
+        for (TwitchIrcClient client : activeClients.values()) {
+            client.disconnect();
+        }
+        activeClients.clear();
     }
 
     public void connect(String channel) {
@@ -91,6 +129,14 @@ public class IrcManager {
                 detectorMinMessageCount,
                 detectorMinEmoteDensity
         );
+
+        // Wire viewer count tracker if available
+        if (viewerCountTracker != null) {
+            detector.setViewerCountTracker(viewerCountTracker);
+            String cleanChannel = channel.startsWith("#") ? channel.substring(1) : channel;
+            viewerCountTracker.trackChannel(cleanChannel);
+        }
+
         HighlightScorer scorer = new HighlightScorer(
                 scoringEmoteWeight, scoringRateWeight, scoringSubscriberWeight, emoteDictionary);
 
@@ -140,6 +186,10 @@ public class IrcManager {
         TwitchIrcClient client = activeClients.remove(channelName);
         if (client != null) {
             client.disconnect();
+            if (viewerCountTracker != null) {
+                String cleanChannel = channelName.substring(1);
+                viewerCountTracker.untrackChannel(cleanChannel);
+            }
             log.info("Disconnected from channel: {}", channelName);
         }
     }
