@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class HighlightScorer {
@@ -43,8 +44,22 @@ public class HighlightScorer {
         double durationSec = Math.max(Duration.between(start, end).toMillis() / 1000.0, 0.1);
         double messageRate = messageCount / durationSec;
 
+        Map<String, String> emoteMap = emoteDictionary != null ? emoteDictionary.getEmoteMap() : Map.of();
+
         for (ChatMessage msg : messages) {
             emoteCount += msg.getEmotes().size();
+
+            // Also detect 7TV/FFZ emotes from text
+            int textEmotes = countTextEmotes(msg.getText(), emoteMap);
+            if (textEmotes > 0) {
+                emoteCount += textEmotes;
+                for (String name : emoteMap.values()) {
+                    if (msg.getText().toLowerCase().contains(name.toLowerCase())) {
+                        emoteFrequency.merge(name, 1, Integer::sum);
+                    }
+                }
+            }
+
             if (msg.isSubscriber()) subCount++;
 
             for (var emote : msg.getEmotes()) {
@@ -90,5 +105,18 @@ public class HighlightScorer {
             return emoteDictionary.resolveEmoteName(emoteId);
         }
         return emoteId;
+    }
+
+    private int countTextEmotes(String text, Map<String, String> emoteMap) {
+        if (text == null || text.isEmpty() || emoteMap.isEmpty()) return 0;
+        int count = 0;
+        for (String name : emoteMap.values()) {
+            // Match whole word emotes (case-insensitive)
+            String pattern = "(?<!\\w)" + Pattern.quote(name) + "(?!\\w)";
+            if (text.toLowerCase().contains(name.toLowerCase())) {
+                count++;
+            }
+        }
+        return count;
     }
 }
