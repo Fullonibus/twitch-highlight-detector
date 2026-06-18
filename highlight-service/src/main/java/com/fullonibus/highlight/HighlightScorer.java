@@ -7,8 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class HighlightScorer {
@@ -18,6 +19,7 @@ public class HighlightScorer {
     private final double subscriberWeight;
     private final int maxTopEmotes;
     private final EmoteDictionary emoteDictionary;
+    private final Pattern textEmotePattern;
 
     private static final int DEFAULT_MAX_TOP_EMOTES = 5;
 
@@ -27,6 +29,19 @@ public class HighlightScorer {
         this.subscriberWeight = subscriberWeight;
         this.maxTopEmotes = DEFAULT_MAX_TOP_EMOTES;
         this.emoteDictionary = emoteDictionary;
+        this.textEmotePattern = buildTextEmotePattern(emoteDictionary);
+    }
+
+    private static Pattern buildTextEmotePattern(EmoteDictionary emoteDictionary) {
+        if (emoteDictionary == null) return null;
+        Map<String, String> map = emoteDictionary.getEmoteMap();
+        if (map == null || map.isEmpty()) return null;
+        String alternation = map.values().stream()
+                .filter(n -> n != null && !n.isEmpty())
+                .map(Pattern::quote)
+                .collect(Collectors.joining("|"));
+        if (alternation.isEmpty()) return null;
+        return Pattern.compile("(?i)(?<!\\w)(" + alternation + ")(?!\\w)");
     }
 
     public Highlight score(List<ChatMessage> messages, String channel) {
@@ -44,20 +59,14 @@ public class HighlightScorer {
         double durationSec = Math.max(Duration.between(start, end).toMillis() / 1000.0, 0.1);
         double messageRate = messageCount / durationSec;
 
-        Map<String, String> emoteMap = emoteDictionary != null ? emoteDictionary.getEmoteMap() : Map.of();
-
         for (ChatMessage msg : messages) {
             emoteCount += msg.getEmotes().size();
 
-            // Also detect 7TV/FFZ emotes from text
-            int textEmotes = countTextEmotes(msg.getText(), emoteMap);
-            if (textEmotes > 0) {
-                emoteCount += textEmotes;
-                for (String name : emoteMap.values()) {
-                    if (msg.getText().toLowerCase().contains(name.toLowerCase())) {
-                        emoteFrequency.merge(name, 1, Integer::sum);
-                    }
-                }
+            // Also detect 7TV/FFZ emotes from text (single regex pass per message)
+            Map<String, Integer> textEmotes = findTextEmotes(msg.getText());
+            if (!textEmotes.isEmpty()) {
+                emoteCount += textEmotes.values().stream().mapToInt(Integer::intValue).sum();
+                textEmotes.forEach((name, c) -> emoteFrequency.merge(name, c, Integer::sum));
             }
 
             if (msg.isSubscriber()) subCount++;
@@ -107,16 +116,13 @@ public class HighlightScorer {
         return emoteId;
     }
 
-    private int countTextEmotes(String text, Map<String, String> emoteMap) {
-        if (text == null || text.isEmpty() || emoteMap.isEmpty()) return 0;
-        int count = 0;
-        for (String name : emoteMap.values()) {
-            // Match whole word emotes (case-insensitive)
-            String pattern = "(?<!\\w)" + Pattern.quote(name) + "(?!\\w)";
-            if (text.toLowerCase().contains(name.toLowerCase())) {
-                count++;
-            }
+    private Map<String, Integer> findTextEmotes(String text) {
+        if (text == null || text.isEmpty() || textEmotePattern == null) return Map.of();
+        Map<String, Integer> found = new HashMap<>();
+        Matcher m = textEmotePattern.matcher(text);
+        while (m.find()) {
+            found.merge(m.group(1), 1, Integer::sum);
         }
-        return count;
+        return found;
     }
 }

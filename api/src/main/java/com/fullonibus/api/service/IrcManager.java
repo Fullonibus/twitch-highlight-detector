@@ -30,6 +30,9 @@ public class IrcManager implements AppMetrics.IrcConnectionProvider, AppMetrics.
     @Value("${twitch.irc.token:}")
     private String twitchToken;
 
+    @Value("${twitch.irc.nick:justinfan1234}")
+    private String twitchNick;
+
     @Value("${detector.window-seconds:30}")
     private int detectorWindowSeconds;
 
@@ -136,7 +139,7 @@ public class IrcManager implements AppMetrics.IrcConnectionProvider, AppMetrics.
             return;
         }
 
-        TwitchIrcClient client = new TwitchIrcClient(twitchToken);
+        TwitchIrcClient client = new TwitchIrcClient(twitchToken, twitchNick);
 
         SpikeDetector detector = new SpikeDetector(
                 Duration.ofSeconds(detectorWindowSeconds),

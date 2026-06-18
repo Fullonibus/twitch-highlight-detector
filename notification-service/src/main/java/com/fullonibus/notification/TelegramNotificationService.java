@@ -1,5 +1,7 @@
 package com.fullonibus.notification;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,7 @@ public class TelegramNotificationService {
     private String botToken;
     private String chatId;
     private final HttpClient httpClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public TelegramNotificationService() {
         this.httpClient = HttpClient.newBuilder()
@@ -88,8 +91,11 @@ public class TelegramNotificationService {
         try {
             String url = TELEGRAM_API.formatted(botToken);
 
-            String escapedText = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-            String jsonBody = "{\"chat_id\":\"" + chatId + "\",\"text\":\"" + escapedText + "\",\"parse_mode\":\"HTML\"}";
+            ObjectNode payload = objectMapper.createObjectNode();
+            payload.put("chat_id", chatId);
+            payload.put("text", text);
+            payload.put("parse_mode", "HTML");
+            String jsonBody = objectMapper.writeValueAsString(payload);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))

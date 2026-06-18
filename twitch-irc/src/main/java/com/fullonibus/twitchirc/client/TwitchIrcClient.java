@@ -19,6 +19,7 @@ public class TwitchIrcClient {
     private static final long MAX_BACKOFF_MS = 60000;
 
     private final String token;
+    private final String nick;
     private final String channel;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "twitch-irc");
@@ -37,8 +38,9 @@ public class TwitchIrcClient {
     });
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
 
-    public TwitchIrcClient(String token) {
+    public TwitchIrcClient(String token, String nick) {
         this.token = token;
+        this.nick = nick != null && !nick.isBlank() ? nick : "justinfan1234";
         this.channel = null;
     }
 
@@ -65,7 +67,7 @@ public class TwitchIrcClient {
                 public void onOpen(ServerHandshake handshake) {
                     log.info("Connected to Twitch IRC, joining {}", channelName);
                     send("PASS oauth:" + token);
-                    send("NICK grombila");
+                    send("NICK " + nick);
                     send("CAP REQ :twitch.tv/tags twitch.tv/commands");
                     send("JOIN " + channelName);
                     reconnectAttempts.set(0);
@@ -134,8 +136,20 @@ public class TwitchIrcClient {
         if (wsClient != null) {
             wsClient.close();
         }
-        executor.shutdownNow();
-        reconnectScheduler.shutdownNow();
+        shutdownQuietly(executor, "twitch-irc");
+        shutdownQuietly(reconnectScheduler, "twitch-irc-reconnect");
+    }
+
+    private static void shutdownQuietly(ExecutorService executor, String name) {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     public boolean isConnected() {

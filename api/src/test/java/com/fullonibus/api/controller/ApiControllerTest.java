@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fullonibus.api.entity.HighlightEntity;
 import com.fullonibus.api.entity.JsonListConverter;
 import com.fullonibus.api.repository.HighlightRepository;
+import com.fullonibus.notification.TelegramNotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -38,6 +39,9 @@ class ApiControllerTest {
 
     @MockitoBean
     private com.fullonibus.api.service.IrcManager ircManager;
+
+    @MockitoBean
+    private TelegramNotificationService notificationService;
 
     @Test
     void health_returnsUp() throws Exception {

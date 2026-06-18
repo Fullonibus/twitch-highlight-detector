@@ -20,7 +20,7 @@ public class SpikeDetector {
     private final int minMessageCount;
     private final double minEmoteDensity;
     private Instant lastSpikeTime = Instant.MIN;
-    private double baselineRate = 0;
+    private volatile double baselineRate = 0;
 
     // Warm-up state
     private static final int WARMUP_MESSAGE_THRESHOLD = 20;

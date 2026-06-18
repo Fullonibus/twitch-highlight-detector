@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 public class ViewerCountTracker {
@@ -19,7 +20,7 @@ public class ViewerCountTracker {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
     private final String clientId;
-    private String accessToken;
+    private final AtomicReference<String> accessToken;
     private final String refreshToken;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -30,7 +31,7 @@ public class ViewerCountTracker {
 
     public ViewerCountTracker(String clientId, String accessToken, String refreshToken, long pollIntervalSeconds) {
         this.clientId = clientId;
-        this.accessToken = accessToken;
+        this.accessToken = new AtomicReference<>(accessToken);
         this.refreshToken = refreshToken;
         this.pollIntervalSeconds = pollIntervalSeconds;
         this.httpClient = HttpClient.newBuilder()
@@ -89,7 +90,7 @@ public class ViewerCountTracker {
                     .uri(URI.create(TWITCH_STREAMS_URL + channel))
                     .timeout(REQUEST_TIMEOUT)
                     .header("Client-Id", clientId)
-                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Authorization", "Bearer " + accessToken.get())
                     .GET()
                     .build();
 
@@ -143,7 +144,7 @@ public class ViewerCountTracker {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
                 JsonNode root = objectMapper.readTree(response.body());
-                this.accessToken = root.path("access_token").asText();
+                this.accessToken.set(root.path("access_token").asText());
                 log.info("Successfully refreshed Twitch API token");
             } else {
                 log.warn("Failed to refresh Twitch token: HTTP {}", response.statusCode());
